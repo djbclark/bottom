@@ -1,11 +1,12 @@
 # Fork-only workflow (djbclark/bottom): checks and builds the middle-truncation branch.
-# Not part of upstream; keep it out of any upstream PR.
+# Not part of upstream; keep it out of any upstream PR. It deliberately has no
+# `pull_request` trigger: a PR run uses the PR head's copy of this file, so an outsider's
+# PR could upload a trojan as the `btm-macos-arm64` artifact that btm-mt is installed from.
 
 name: fork build
 
 on:
   workflow_dispatch:
-  pull_request:
   push:
     branches:
       - middle-truncate-command
@@ -37,7 +38,6 @@ jobs:
   build-macos:
     name: release build (macOS arm64)
     runs-on: macos-15
-    if: github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust
