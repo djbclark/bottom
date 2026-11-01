@@ -181,6 +181,9 @@
 # Shows the full command name instead of the process name by default.
 #process_command = false
 
+# When a full command is shown, cuts one that is too wide in the middle (`[...]`) instead of the end.
+#truncate_cmd_middle = false
+
 # Disable the advanced kill dialog and just show the basic one with no options. Only available on Linux, macOS, and FreeBSD.
 #disable_advanced_kill = false
 

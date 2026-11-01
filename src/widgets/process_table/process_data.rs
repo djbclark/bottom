@@ -4,12 +4,16 @@ use std::{
     fmt::Display,
     num::NonZeroU16,
     ops::Add,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{self, AtomicBool},
+    },
     time::Duration,
 };
 
 use concat_string::concat_string;
 use ratatui::widgets::Row;
+use unicode_width::UnicodeWidthStr;
 
 use super::process_columns::ProcColumn;
 #[cfg(target_os = "linux")]
@@ -21,8 +25,22 @@ use crate::{
     },
     collection::processes::{Bytes, Pid, ProcessHarvest},
     dec_bytes_per_second_string,
-    utils::data_units::{GIBI_LIMIT, GIGA_LIMIT, get_binary_bytes, get_decimal_bytes},
+    utils::{
+        data_units::{GIBI_LIMIT, GIGA_LIMIT, get_binary_bytes, get_decimal_bytes},
+        strings::truncate_middle,
+    },
 };
+
+/// Whether a command that does not fit its column is cut in the middle (keeping
+/// its start and end) instead of at the end. Set once at startup from
+/// `processes.truncate_command_middle`.
+static TRUNCATE_COMMAND_MIDDLE: AtomicBool = AtomicBool::new(false);
+
+/// Sets whether commands are truncated in the middle. See
+/// [`TRUNCATE_COMMAND_MIDDLE`].
+pub fn set_truncate_command_middle(enabled: bool) {
+    TRUNCATE_COMMAND_MIDDLE.store(enabled, atomic::Ordering::Relaxed);
+}
 
 #[derive(Clone, Debug)]
 enum IdType {
@@ -79,6 +97,32 @@ impl Id {
                 IdType::Name(name) => name.to_string(),
                 IdType::Command(cmd) => cmd.to_string(),
             }
+        }
+    }
+
+    /// Returns the ID with prefix as a [`String`] to show in a cell `width`
+    /// cells wide. If middle truncation is enabled, a command that does not fit
+    /// is cut in the middle, and the prefix (e.g. the tree branch) is kept whole.
+    /// Anything else is returned as is, for the table to truncate at the end.
+    pub fn to_cell_string(&self, width: usize) -> String {
+        match (&self.id_type, &self.prefix) {
+            (IdType::Command(cmd), prefix)
+                if TRUNCATE_COMMAND_MIDDLE.load(atomic::Ordering::Relaxed) =>
+            {
+                match prefix {
+                    Some(prefix) => {
+                        let remaining =
+                            width.saturating_sub(UnicodeWidthStr::width(prefix.as_str()));
+                        let cmd = truncate_middle(cmd, remaining);
+                        let mut cell = String::with_capacity(prefix.len() + cmd.len());
+                        cell.push_str(prefix);
+                        cell.push_str(&cmd);
+                        cell
+                    }
+                    None => truncate_middle(cmd, width).into_owned(),
+                }
+            }
+            _ => self.to_prefixed_string(),
         }
     }
 }
@@ -378,7 +422,9 @@ impl DataToCell<ProcColumn> for ProcWidgetData {
                 .into(),
             ProcColumn::Pid => self.pid.to_string().into(),
             ProcColumn::Count => self.num_similar.to_string().into(),
-            ProcColumn::Name | ProcColumn::Command => self.id.to_prefixed_string().into(),
+            ProcColumn::Name | ProcColumn::Command => {
+                self.id.to_cell_string(calculated_width.get().into()).into()
+            }
             ProcColumn::ReadPerSecond => dec_bytes_per_second_string(self.rps).into(),
             ProcColumn::WritePerSecond => dec_bytes_per_second_string(self.wps).into(),
             ProcColumn::TotalRead => dec_bytes_string(self.total_read).into(),

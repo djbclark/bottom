@@ -572,6 +572,14 @@ pub(crate) fn init_app(args: BottomArgs, config: Config) -> Result<(App, BottomL
 
     let process_default_sort_order = config.processes.as_ref().and_then(|cfg| cfg.sort_order);
 
+    set_truncate_command_middle(
+        config
+            .processes
+            .as_ref()
+            .and_then(|cfg| cfg.truncate_cmd_middle)
+            .unwrap_or(false),
+    );
+
     let table_config = ProcTableConfig {
         is_case_sensitive,
         is_match_whole_word,

@@ -1201,6 +1201,13 @@
             "null"
           ]
         },
+        "truncate_cmd_middle": {
+          "description": "When a full command is shown, cuts one that is too wide in the middle (`[...]`) instead of the end.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "unnormalized_cpu": {
           "description": "Show process CPU% usage without averaging over the number of CPU cores.",
           "type": [
