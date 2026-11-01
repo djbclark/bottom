@@ -148,7 +148,9 @@ fn make_column(column: ProcColumn) -> SortColumn<ProcColumn> {
         Pid => SortColumn::new(Pid),
         Count => SortColumn::new(Count),
         Name => SortColumn::soft(Name, Some(0.3)),
-        Command => SortColumn::soft(Command, Some(0.3)),
+        // Fork: no width cap, so a command (cut in the middle with
+        // `truncate_cmd_middle`) uses all the width the other columns leave.
+        Command => SortColumn::soft(Command, None),
         ReadPerSecond => SortColumn::hard(ReadPerSecond, 8).default_descending(),
         WritePerSecond => SortColumn::hard(WritePerSecond, 8).default_descending(),
         TotalRead => SortColumn::hard(TotalRead, 8).default_descending(),
@@ -1024,7 +1026,7 @@ impl ProcWidgetState {
                 ProcColumn::Name => {
                     *inner = ProcColumn::Command;
                     if let ColumnWidthBounds::Soft { max_percentage, .. } = col.bounds_mut() {
-                        *max_percentage = Some(0.5);
+                        *max_percentage = None;
                     }
                 }
                 ProcColumn::Command => {
