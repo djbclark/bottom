@@ -1,15 +1,14 @@
-# Fork note: upstream issue to file (not filed yet)
+# Fork note: upstream issue for the hidden-column bug
 
 Fork-only file (djbclark/bottom, branch `middle-truncate-command`); keep it out of any upstream PR.
 
-bottom's `AI_POLICY.md` requires human-written issues and PRs, so this is a draft for djbclark to rewrite in his
-own words and file at https://github.com/ClementTsang/bottom/issues/new. The fix is fork commit 846e4874
-("tables skip hidden columns when pairing columns with widths"), with a regression test in
-`src/canvas/components/data_table/sortable.rs` (`test_click_header_after_hidden_column`).
+**Filed by djbclark as https://github.com/ClementTsang/bottom/issues/2297** (2026-11-02). The fix PR is prepared:
+see `upstream-pr-hidden-columns.md`.
 
-Checked 2026-11-02: stock Homebrew `btm` 0.15.0 shows the bug (preview of grouped mode with the columns below).
+The fork's fix is commit 846e4874 ("tables skip hidden columns when pairing columns with widths"), with a regression
+test in `src/canvas/components/data_table/sortable.rs` (`test_click_header_after_hidden_column`).
 
-## Draft
+## The draft it was paraphrased from
 
 **Grouped mode shows the wrong columns when a hidden column isn't last**
 
