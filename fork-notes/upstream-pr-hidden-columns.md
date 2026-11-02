@@ -43,11 +43,11 @@ Config `[processes] columns = ["pid", "cpu%", "state", "command"]`, then Tab (gr
 │3                       4.5%                      herdr                                          █│
 ```
 
-CI: upstream's own `ci.yml` was dispatched on the fork for this branch: https://github.com/djbclark/bottom/actions/runs/41460037215
-(result recorded below once it finishes).
 CI: upstream's own `ci.yml`, dispatched on the fork for this branch: https://github.com/djbclark/bottom/actions/runs/41460037215.
 23 jobs passed (Linux, Windows, FreeBSD and the cross targets, including format, clippy and test); the 5 macOS jobs were
 cancelled because GitHub could not get a macOS runner ("The job was not acquired by Runner of type hosted even after
 multiple attempts"), not because of the code. The same code built and passed fmt/clippy/test in the fork's own macOS
 build (run 41379974927), and the PR's own CI run upstream will run the macOS jobs again.
-that CI; a new test was added; no dependency changes; tested on macOS (version above). Docs: none needed (bug fix).
+
+Checklist items you can tick from this: `cargo fmt`, `cargo clippy --all -- -D warnings` and `cargo test` ran in that
+CI; a new test was added; no dependency changes; tested on macOS (version above). Docs: none needed (bug fix).
