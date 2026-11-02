@@ -31,6 +31,9 @@ pub(super) enum ProcessAttribute {
     Name(Regex),
     State(Regex),
     User(Regex),
+    /// The working directory as shown (home as `~`). Only known with
+    /// `processes.split_command`; a process without one never matches.
+    Cwd(Regex),
     Time(TimeQuery),
     #[cfg(unix)]
     Nice(NumericalQuery),
@@ -65,6 +68,11 @@ impl ProcessAttribute {
                 Some(user) => re.is_match(user),
                 None => re.is_match("N/A"),
             },
+            ProcessAttribute::Cwd(re) => process
+                .split_command
+                .as_ref()
+                .and_then(|split| split.cwd.as_deref())
+                .is_some_and(|cwd| re.is_match(cwd)),
             ProcessAttribute::Time(time) => time.check(process.time),
             // TODO: It's a bit silly for some of these, like nice/priority, where it's casted to an
             // f64.
@@ -86,7 +94,11 @@ pub(super) fn new_string_attribute(
     prefix_type: PrefixType, base: &str, regex_options: &QueryOptions,
 ) -> QueryResult<ProcessAttribute> {
     match prefix_type {
-        PrefixType::Pid | PrefixType::Name | PrefixType::State | PrefixType::User => {
+        PrefixType::Pid
+        | PrefixType::Name
+        | PrefixType::State
+        | PrefixType::User
+        | PrefixType::Cwd => {
             let re = new_regex(base, regex_options)?;
 
             match prefix_type {
@@ -94,6 +106,7 @@ pub(super) fn new_string_attribute(
                 PrefixType::Name => Ok(ProcessAttribute::Name(re)),
                 PrefixType::State => Ok(ProcessAttribute::State(re)),
                 PrefixType::User => Ok(ProcessAttribute::User(re)),
+                PrefixType::Cwd => Ok(ProcessAttribute::Cwd(re)),
                 _ => unreachable!(),
             }
         }

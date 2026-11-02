@@ -71,7 +71,7 @@ split_command = true
   `perl`, `php`, shells, ...) it is the interpreter followed by the script's file name, e.g. `python3.15 s1_search.py`
   (or the module, for `python -m`).
 - The working directory shows your home directory as `~`. A process whose directory cannot be read (usually one of
-  another user, unless bottom runs as root) shows a dim `?`.
+  another user, unless bottom runs as root) shows a dim `?`. Search it with `cwd=…` (e.g. `cwd=~/src/bottom`).
 - The options are the remaining arguments; ones with spaces or quotes are single-quoted.
 
 When the column is too narrow, the name is kept whole; the options keep at least 10 cells; the working directory is cut

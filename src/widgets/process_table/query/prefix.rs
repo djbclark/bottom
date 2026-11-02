@@ -231,7 +231,10 @@ impl QueryProcessor for Prefix {
                                 options,
                             )?));
                         }
-                        PrefixType::Pid | PrefixType::State | PrefixType::User => {
+                        PrefixType::Pid
+                        | PrefixType::State
+                        | PrefixType::User
+                        | PrefixType::Cwd => {
                             // We have to check if someone put an (in)equality
                             // check...
                             if content == "=" || content == "!=" {

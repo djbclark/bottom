@@ -167,6 +167,7 @@ Note all keywords are case-insensitive. To search for a process/command that col
 | `twrite` <br/> `t.write`        | `twrite > 1024 tb`                    | Matches the total write column in terms of bytes; supports comparison operators  |
 | `user`                          | `user=root`                           | Matches by user; supports regex                                                  |
 | `state`                         | `state=running`                       | Matches by state; supports regex                                                 |
+| `cwd`                           | `cwd=~/src/bottom`                    | Matches the working directory as shown (`~` for home); supports regex. Needs `split_command` |
 | `()`                            | `(<COND 1> AND <COND 2>) OR <COND 3>` | Group together a condition                                                       |
 | `gmem`                          | `gmem > 1000 b`                       | Matches the gpu memory column in terms of bytes; supports comparison operators   |
 | `gmem%`                         | `gmem% < 0.5`                         | Matches the gpu memory column in terms of percent; supports comparison operators |

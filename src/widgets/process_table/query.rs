@@ -191,6 +191,8 @@ enum PrefixType {
     Name,
     State,
     User,
+    /// The working directory, as shown with `processes.split_command`.
+    Cwd,
     Time,
     #[cfg(unix)]
     Nice,
@@ -236,6 +238,8 @@ impl std::str::FromStr for PrefixType {
             result = State;
         } else if multi_eq_ignore_ascii_case!(s, "user") {
             result = User;
+        } else if multi_eq_ignore_ascii_case!(s, "cwd") {
+            result = Cwd;
         } else if multi_eq_ignore_ascii_case!(s, "time") {
             result = Time;
         } else if multi_eq_ignore_ascii_case!(s, "nice") {
@@ -348,6 +352,41 @@ mod tests {
         assert!(query.check(&exact_match, false));
         assert!(query.check(&contains, false));
         assert!(!query.check(&invalid, false));
+    }
+
+    #[test]
+    fn cwd_query() {
+        use crate::collection::processes::SplitCommand;
+
+        fn in_dir(cwd: Option<&str>) -> ProcessHarvest {
+            ProcessHarvest {
+                name: "omp".into(),
+                split_command: Some(SplitCommand {
+                    name: "omp".into(),
+                    cwd: cwd.map(Into::into),
+                    args: String::new(),
+                }),
+                ..Default::default()
+            }
+        }
+
+        let bottom = in_dir(Some("~/src/bottom"));
+        let other = in_dir(Some("~/src/barnowl"));
+        let unknown = in_dir(None);
+        // Without `split_command`, the directory is not collected.
+        let not_split = simple_process("omp");
+
+        for query in ["cwd=bottom", "cwd bottom", "cwd = ~/src/bot"] {
+            let query = parse_query_no_options(query).unwrap();
+            assert!(query.check(&bottom, false));
+            assert!(!query.check(&other, false));
+            assert!(!query.check(&unknown, false));
+            assert!(!query.check(&not_split, false));
+        }
+
+        let query = parse_query_no_options("cwd != bottom").unwrap();
+        assert!(!query.check(&bottom, false));
+        assert!(query.check(&other, false));
     }
 
     #[test]
