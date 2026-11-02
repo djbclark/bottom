@@ -518,13 +518,9 @@ pub(crate) fn linux_process_data(
     for (pid, tid_paths) in process_threads_to_check {
         for tid_path in tid_paths {
             // VmSwap is process-wide, so don't collect it for individual threads.
-            if let Ok((process, _)) = Process::from_path(
-                tid_path,
-                &mut buffer,
-                false,
-                false,
-                args.split_command,
-            ) {
+            if let Ok((process, _)) =
+                Process::from_path(tid_path, &mut buffer, false, false, args.split_command)
+            {
                 let tid = process.pid;
                 let prev_proc_details = prev_process_details.entry(tid).or_default();
 

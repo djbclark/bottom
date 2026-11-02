@@ -476,6 +476,7 @@ impl ProcWidgetState {
             force_rerender: true,
             force_update_data: false,
             default_sort_index,
+            default_sort_order,
             #[cfg(target_os = "linux")]
             hide_k_threads: config.hide_k_threads,
             split_command: table_config.split_command,
