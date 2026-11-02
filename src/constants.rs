@@ -74,7 +74,7 @@ const PROCESS_HELP_TEXT: [&str; 20] = [
     "t, F5                   Toggle tree mode",
     "Right                   Collapse a branch while in tree mode",
     "Left                    Expand a branch while in tree mode",
-    "+, -, click, Space      Toggle whether a branch is expanded or collapsed in tree mode",
+    "+, -, click, Space      Toggle whether a branch is expanded or collapsed in tree mode (or a group, in grouped mode with split_command)",
     "click on header         Sorts the entries by that column, click again to invert the sort",
     "C                       Sort by GPU usage, press again to reverse",
     "M                       Sort by GPU memory usage, press again to reverse",
@@ -430,8 +430,8 @@ pub(crate) const CONFIG_TEXT: &str = r#"# This is a default config file for bott
 # Shows the full command name instead of the process name by default.
 #process_command = false
 
-# When a full command is shown, cuts one that is too wide in the middle (`[...]`) instead of the end.
-#truncate_cmd_middle = false
+# When a full command is shown, splits it into the command name, the working directory and the options. Grouped processes then expand to show each process.
+#split_command = false
 
 # Disable the advanced kill dialog and just show the basic one with no options. Only available on Linux, macOS, and FreeBSD.
 #disable_advanced_kill = false

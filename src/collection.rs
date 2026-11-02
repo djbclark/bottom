@@ -169,6 +169,9 @@ pub struct DataCollector {
     show_average_cpu: bool,
     get_process_threads: bool,
     get_process_swap: bool,
+    /// Whether to collect each process's argument list split for display and
+    /// its working directory (`processes.split_command`).
+    split_command: bool,
 
     last_list_collection_time: Instant,
     should_run_less_routine_tasks: bool,
@@ -228,6 +231,7 @@ impl DataCollector {
             unnormalized_cpu: false,
             get_process_threads: false,
             get_process_swap: false,
+            split_command: false,
             last_collection_time,
             total_rx: 0,
             total_tx: 0,
@@ -306,6 +310,10 @@ impl DataCollector {
         self.get_process_swap = get_process_swap;
     }
 
+    pub fn set_split_command(&mut self, split_command: bool) {
+        self.split_command = split_command;
+    }
+
     pub fn set_include_unmounted_disks(&mut self, include_unmounted_disks: bool) {
         self.include_unmounted_disks = include_unmounted_disks;
     }
@@ -345,13 +353,20 @@ impl DataCollector {
         #[cfg(not(target_os = "linux"))]
         {
             if self.widgets_to_harvest.use_proc {
+                // The working directory is only shown with `split_command`. A
+                // process can change it at any time, so re-read it each time.
+                let refresh_kind = sysinfo::ProcessRefreshKind::everything()
+                    .without_environ()
+                    .without_root();
+                let refresh_kind = if self.split_command {
+                    refresh_kind.with_cwd(sysinfo::UpdateKind::Always)
+                } else {
+                    refresh_kind.without_cwd()
+                };
                 self.sys.system.refresh_processes_specifics(
                     sysinfo::ProcessesToUpdate::All,
                     true,
-                    sysinfo::ProcessRefreshKind::everything()
-                        .without_environ()
-                        .without_cwd()
-                        .without_root(),
+                    refresh_kind,
                 );
 
                 // For Windows, sysinfo also handles the users list.

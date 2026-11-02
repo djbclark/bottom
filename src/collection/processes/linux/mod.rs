@@ -13,7 +13,7 @@ use process::*;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use sysinfo::ProcessStatus;
 
-use super::{Pid, ProcessHarvest, UserTable, process_status_str};
+use super::{Pid, ProcessHarvest, SplitCommand, UserTable, process_status_str};
 use crate::collection::{DataCollector, error::CollectionResult, processes::ProcessType};
 
 /// Maximum character length of a `/proc/<PID>/stat` process name (the length is
@@ -133,8 +133,8 @@ fn get_linux_cpu_usage(
 }
 
 fn read_proc(
-    prev_proc: &PrevProcDetails, process: Process, args: ReadProcArgs, user_table: &mut UserTable,
-    thread_parent: Option<Pid>,
+    prev_proc: &PrevProcDetails, process: Process, args: ReadProcArgs, home: Option<&str>,
+    user_table: &mut UserTable, thread_parent: Option<Pid>,
 ) -> CollectionResult<(ProcessHarvest, u64)> {
     let Process {
         pid: _pid,
@@ -142,6 +142,7 @@ fn read_proc(
         stat,
         io,
         cmdline,
+        cwd,
         swap_bytes,
     } = process;
 
@@ -154,6 +155,7 @@ fn read_proc(
         system_uptime,
         get_process_threads: _,
         get_process_swap: _,
+        split_command,
     } = args;
 
     let process_state_char = stat.state;
@@ -217,6 +219,23 @@ fn read_proc(
         Duration::ZERO
     };
 
+    // `cmdline` separates arguments with NULs, and ends with one.
+    let split_command = split_command.then(|| {
+        let (argv, fallback): (Vec<&str>, String) = match &cmdline {
+            Some(cmdline) if !cmdline.is_empty() => (
+                cmdline
+                    .strip_suffix('\0')
+                    .unwrap_or(cmdline)
+                    .split('\0')
+                    .collect(),
+                stat.comm.clone(),
+            ),
+            Some(_) => (Vec::new(), concat_string!("[", stat.comm, "]")),
+            None => (Vec::new(), stat.comm.clone()),
+        };
+        SplitCommand::new(&argv, cwd.as_deref(), home, &fallback)
+    });
+
     let (command, name) = {
         let comm = stat.comm;
         if let Some(cmdline) = cmdline {
@@ -277,6 +296,7 @@ fn read_proc(
             swap_bytes,
             name,
             command,
+            split_command,
             read_per_sec,
             write_per_sec,
             total_read,
@@ -353,6 +373,7 @@ pub(crate) struct ReadProcArgs {
     pub system_uptime: u64,
     pub get_process_threads: bool,
     pub get_process_swap: bool,
+    pub split_command: bool,
 }
 
 pub(crate) fn linux_process_data(
@@ -369,6 +390,11 @@ pub(crate) fn linux_process_data(
         get_process_threads: collector.get_process_threads,
     };
     let get_swap = collector.get_process_swap;
+    let split_command = collector.split_command;
+    let home = split_command
+        .then(dirs::home_dir)
+        .flatten()
+        .map(|home| home.to_string_lossy().into_owned());
 
     let prev_process_details = &mut collector.prev_process_details;
     let user_table = &mut collector.user_table;
@@ -427,6 +453,7 @@ pub(crate) fn linux_process_data(
         system_uptime: sysinfo::System::uptime(),
         get_process_threads: get_threads,
         get_process_swap: get_swap,
+        split_command,
     };
 
     // TODO: Maybe pre-allocate these buffers in the future w/ routine cleanup.
@@ -440,14 +467,20 @@ pub(crate) fn linux_process_data(
                 &mut buffer,
                 args.get_process_threads,
                 args.get_process_swap,
+                args.split_command,
             ) {
                 let pid = process.pid;
                 let prev_proc_details = prev_process_details.entry(pid).or_default();
 
                 #[cfg_attr(not(feature = "gpu"), expect(unused_mut))]
-                if let Ok((mut process_harvest, new_process_times)) =
-                    read_proc(prev_proc_details, process, args, user_table, None)
-                {
+                if let Ok((mut process_harvest, new_process_times)) = read_proc(
+                    prev_proc_details,
+                    process,
+                    args,
+                    home.as_deref(),
+                    user_table,
+                    None,
+                ) {
                     #[cfg(feature = "gpu")]
                     if let Some(gpus) = &collector.gpu_pids {
                         gpus.iter().for_each(|gpu| {
@@ -485,13 +518,24 @@ pub(crate) fn linux_process_data(
     for (pid, tid_paths) in process_threads_to_check {
         for tid_path in tid_paths {
             // VmSwap is process-wide, so don't collect it for individual threads.
-            if let Ok((process, _)) = Process::from_path(tid_path, &mut buffer, false, false) {
+            if let Ok((process, _)) = Process::from_path(
+                tid_path,
+                &mut buffer,
+                false,
+                false,
+                args.split_command,
+            ) {
                 let tid = process.pid;
                 let prev_proc_details = prev_process_details.entry(tid).or_default();
 
-                if let Ok((process_harvest, new_process_times)) =
-                    read_proc(prev_proc_details, process, args, user_table, Some(pid))
-                {
+                if let Ok((process_harvest, new_process_times)) = read_proc(
+                    prev_proc_details,
+                    process,
+                    args,
+                    home.as_deref(),
+                    user_table,
+                    Some(pid),
+                ) {
                     prev_proc_details.cpu_time = new_process_times;
                     prev_proc_details.total_read_bytes = process_harvest.total_read;
                     prev_proc_details.total_write_bytes = process_harvest.total_write;

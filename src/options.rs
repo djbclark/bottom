@@ -484,6 +484,11 @@ pub(crate) fn init_app(args: BottomArgs, config: Config) -> Result<(App, BottomL
         get_process_swap: proc_columns
             .as_ref()
             .is_some_and(|columns| columns.contains(&ProcWidgetColumn::Swap)),
+        split_command: config
+            .processes
+            .as_ref()
+            .and_then(|cfg| cfg.split_command)
+            .unwrap_or(false),
         use_basic_mode,
         default_time_value,
         time_interval: get_time_interval(args, config, retention_ms)?,
@@ -572,14 +577,6 @@ pub(crate) fn init_app(args: BottomArgs, config: Config) -> Result<(App, BottomL
 
     let process_default_sort_order = config.processes.as_ref().and_then(|cfg| cfg.sort_order);
 
-    set_truncate_command_middle(
-        config
-            .processes
-            .as_ref()
-            .and_then(|cfg| cfg.truncate_cmd_middle)
-            .unwrap_or(false),
-    );
-
     let table_config = ProcTableConfig {
         is_case_sensitive,
         is_match_whole_word,
@@ -588,6 +585,7 @@ pub(crate) fn init_app(args: BottomArgs, config: Config) -> Result<(App, BottomL
         is_command: is_default_command,
         default_sort: process_default_sort,
         sort_order: process_default_sort_order,
+        split_command: app_config_fields.split_command,
     };
 
     for row in &widget_layout.rows {

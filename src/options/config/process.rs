@@ -34,8 +34,10 @@ pub(crate) struct ProcessesConfig {
     /// Shows the full command name instead of the process name by default.
     pub process_command: Option<bool>,
 
-    /// When a full command is shown, cuts one that is too wide in the middle (`[...]`) instead of the end.
-    pub truncate_cmd_middle: Option<bool>,
+    /// When a full command is shown, splits it into the command name, the
+    /// working directory and the options. Grouped processes then expand to
+    /// show each process.
+    pub split_command: Option<bool>,
 
     // This does nothing on Windows, but we leave it enabled to make the config file consistent
     // across platforms.

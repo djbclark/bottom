@@ -2,8 +2,10 @@
 //! Based on the [procfs](https://github.com/eminence/procfs) crate.
 
 use std::{
+    ffi::OsString,
     fs::File,
     io::{self, BufRead, BufReader, Read},
+    os::unix::ffi::OsStringExt,
     path::PathBuf,
     sync::OnceLock,
 };
@@ -282,6 +284,8 @@ pub(crate) struct Process {
     pub stat: Stat,
     pub io: Option<Io>,
     pub cmdline: Option<String>,
+    /// The working directory, read only if asked for (`split_command`).
+    pub cwd: Option<PathBuf>,
     pub swap_bytes: Option<u64>,
 }
 
@@ -305,7 +309,7 @@ impl Process {
     /// buffer.
     #[inline]
     pub(crate) fn from_path(
-        pid_path: PathBuf, buffer: &mut String, get_threads: bool, get_swap: bool,
+        pid_path: PathBuf, buffer: &mut String, get_threads: bool, get_swap: bool, get_cwd: bool,
     ) -> anyhow::Result<(Process, Vec<PathBuf>)> {
         buffer.clear();
 
@@ -371,6 +375,15 @@ impl Process {
             None
         };
 
+        // This fails for another user's process unless we are root.
+        let cwd = if get_cwd {
+            rustix::fs::readlinkat(&pid_dir, "cwd", Vec::new())
+                .ok()
+                .map(|path| PathBuf::from(OsString::from_vec(path.into_bytes())))
+        } else {
+            None
+        };
+
         let threads = threads(&mut root, pid, get_threads);
 
         Ok((
@@ -380,6 +393,7 @@ impl Process {
                 stat,
                 io,
                 cmdline,
+                cwd,
                 swap_bytes,
             },
             threads,

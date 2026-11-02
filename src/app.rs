@@ -49,6 +49,9 @@ pub struct AppConfigFields {
     pub unnormalized_cpu: bool,
     pub get_process_threads: bool,
     pub get_process_swap: bool,
+    /// Whether the full command is split into name, working directory and
+    /// options (`processes.split_command`).
+    pub split_command: bool,
     pub use_basic_mode: bool,
     pub default_time_value: u64,
     pub time_interval: u64,
@@ -1008,12 +1011,15 @@ impl App {
             && let Some(current) = pws.table.current_item()
         {
             let id = current.id.to_string();
-            if let Some(pids) = pws
-                .id_pid_map
-                .get(&id)
-                .cloned()
-                .or_else(|| Some(vec![current.pid]))
-            {
+            // Only a row standing for several processes (grouped mode) kills
+            // them all; a process listed under an expanded group shares its
+            // group's name but is just itself.
+            let group_pids = if current.num_similar > 1 {
+                pws.id_pid_map.get(&id).cloned()
+            } else {
+                None
+            };
+            if let Some(pids) = group_pids.or_else(|| Some(vec![current.pid])) {
                 let current_process = (id, pids);
 
                 let use_simple_selection = {

@@ -9,7 +9,7 @@ use windows::Win32::{
     System::Threading::{GetPriorityClass, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
 };
 
-use super::{ProcessHarvest, process_status_str};
+use super::{ProcessHarvest, SplitCommand, process_status_str};
 use crate::collection::{DataCollector, error::CollectionResult};
 
 /// See [here](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getpriorityclass)
@@ -53,6 +53,11 @@ pub fn sysinfo_process_data(
     let process_hashmap = sys.processes();
     let cpu_usage = sys.global_cpu_usage() / 100.0;
     let num_processors = sys.cpus().len();
+    let home = collector
+        .split_command
+        .then(dirs::home_dir)
+        .flatten()
+        .map(|home| home.to_string_lossy().into_owned());
 
     for process in process_hashmap.values() {
         let name = if process.name().is_empty() {
@@ -78,6 +83,10 @@ pub fn sysinfo_process_data(
                 command
             }
         };
+        let split = collector.split_command.then(|| {
+            let argv: Vec<_> = process.cmd().iter().map(|s| s.to_string_lossy()).collect();
+            SplitCommand::new(&argv, process.cwd(), home.as_deref(), &command)
+        });
 
         let process_cpu_usage = {
             let pcu = {
@@ -129,6 +138,7 @@ pub fn sysinfo_process_data(
             parent_pid: process.parent().map(|p| p.as_u32() as _),
             name,
             command,
+            split_command: split,
             mem_usage_percent: if total_memory > 0 {
                 process.memory() as f64 * 100.0 / total_memory as f64
             } else {

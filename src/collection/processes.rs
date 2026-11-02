@@ -37,6 +37,10 @@ cfg_select! {
     _ => {}
 }
 
+mod split_command;
+
+pub use split_command::SplitCommand;
+
 use std::{sync::Arc, time::Duration};
 
 use super::{DataCollector, error::CollectionResult};
@@ -114,6 +118,10 @@ pub struct ProcessHarvest {
 
     /// The exact command for the process.
     pub command: String,
+
+    /// The command split into name, working directory and options, if
+    /// `processes.split_command` is on.
+    pub split_command: Option<SplitCommand>,
 
     /// Bytes read per second.
     pub read_per_sec: Bytes,

@@ -238,16 +238,20 @@ where
                                 .iter()
                                 .zip(&self.state.calculated_widths)
                                 .filter_map(|(column, &width)| {
-                                    data_row.to_cell_text(column.inner(), width).map(|content| {
-                                        let content = truncate_to_text(&content, width.get());
-
-                                        if let Some(style) =
-                                            data_row.style_cell(column.inner(), painter)
+                                    let content: Text<'_> =
+                                        match data_row.to_cell_line(column.inner(), width, painter)
                                         {
-                                            Cell::new(content).style(style)
-                                        } else {
-                                            Cell::new(content)
-                                        }
+                                            Some(line) => line.into(),
+                                            None => truncate_to_text(
+                                                &data_row.to_cell_text(column.inner(), width)?,
+                                                width.get(),
+                                            ),
+                                        };
+
+                                    let cell = Cell::new(content);
+                                    Some(match data_row.style_cell(column.inner(), painter) {
+                                        Some(style) => cell.style(style),
+                                        None => cell,
                                     })
                                 }),
                         );

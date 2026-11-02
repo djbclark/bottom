@@ -1,6 +1,6 @@
 use std::{borrow::Cow, num::NonZeroU16};
 
-use ratatui::{style::Style, widgets::Row};
+use ratatui::{style::Style, text::Line, widgets::Row};
 
 use super::{ColumnHeader, DataTableColumn};
 use crate::canvas::Painter;
@@ -12,6 +12,21 @@ where
     /// Given data, a column, and its corresponding width, return the string in
     /// the cell that will be displayed in the [`super::DataTable`].
     fn to_cell_text(&self, column: &H, calculated_width: NonZeroU16) -> Option<Cow<'static, str>>;
+
+    /// Like [`Self::to_cell_text`], for a cell drawn with more than one style.
+    /// If this returns [`Some`], it is drawn instead of the text, and must
+    /// already fit in `calculated_width`.
+    ///
+    /// By default this just returns [`None`].
+    #[expect(
+        unused_variables,
+        reason = "The default implementation just returns `None`."
+    )]
+    fn to_cell_line(
+        &self, column: &H, calculated_width: NonZeroU16, painter: &Painter,
+    ) -> Option<Line<'static>> {
+        None
+    }
 
     /// Given a column, how to style a cell if one needs to override the default
     /// styling.

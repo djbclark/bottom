@@ -9,7 +9,11 @@ use super::{ProcessHarvest, process_status_str};
 #[cfg(target_os = "macos")]
 use crate::collection::processes::macos::sysctl_bindings;
 use crate::{
-    collection::{Pid, error::CollectionResult, processes::UserTable},
+    collection::{
+        Pid,
+        error::CollectionResult,
+        processes::{SplitCommand, UserTable},
+    },
     utils::int_hash::IntHashMap,
 };
 
@@ -74,12 +78,16 @@ fn get_priority(pid: Pid) -> i32 {
 pub(crate) trait UnixProcessExt {
     fn sysinfo_process_data(
         sys: &System, use_current_cpu_total: bool, unnormalized_cpu: bool, total_memory: u64,
-        user_table: &mut UserTable,
+        split_command: bool, user_table: &mut UserTable,
     ) -> CollectionResult<Vec<ProcessHarvest>> {
         let mut process_vector: Vec<ProcessHarvest> = Vec::new();
         let process_hashmap = sys.processes();
         let cpu_usage = sys.global_cpu_usage() / 100.0;
         let num_processors = sys.cpus().len();
+        let home = split_command
+            .then(dirs::home_dir)
+            .flatten()
+            .map(|home| home.to_string_lossy().into_owned());
 
         for process_val in process_hashmap.values() {
             let name = if process_val.name().is_empty() {
@@ -109,6 +117,14 @@ pub(crate) trait UnixProcessExt {
                     command
                 }
             };
+            let split = split_command.then(|| {
+                let argv: Vec<_> = process_val
+                    .cmd()
+                    .iter()
+                    .map(|s| s.to_string_lossy())
+                    .collect();
+                SplitCommand::new(&argv, process_val.cwd(), home.as_deref(), &command)
+            });
 
             let pcu = {
                 let usage = process_val.cpu_usage();
@@ -139,6 +155,7 @@ pub(crate) trait UnixProcessExt {
                 parent_pid: Self::parent_pid(process_val),
                 name,
                 command,
+                split_command: split,
                 mem_usage_percent: if total_memory > 0 {
                     (process_val.memory() as f64 * 100.0 / total_memory as f64) as f32
                 } else {

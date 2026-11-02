@@ -148,8 +148,8 @@ fn make_column(column: ProcColumn) -> SortColumn<ProcColumn> {
         Pid => SortColumn::new(Pid),
         Count => SortColumn::new(Count),
         Name => SortColumn::soft(Name, Some(0.3)),
-        // Fork: no width cap, so a command (cut in the middle with
-        // `truncate_cmd_middle`) uses all the width the other columns leave.
+        // Fork: no width cap, so a command (split with `split_command`) uses
+        // all the width the other columns leave.
         Command => SortColumn::soft(Command, None),
         ReadPerSecond => SortColumn::hard(ReadPerSecond, 8).default_descending(),
         WritePerSecond => SortColumn::hard(WritePerSecond, 8).default_descending(),
@@ -179,6 +179,8 @@ pub struct ProcTableConfig {
     pub is_command: bool,
     pub default_sort: Option<ProcColumn>,
     pub sort_order: Option<SortOrder>,
+    /// Split the full command into name, working directory and options.
+    pub split_command: bool,
 }
 
 /// A hacky workaround for now.
@@ -238,6 +240,14 @@ pub struct ProcWidgetState {
     pub force_update_data: bool,
     #[cfg(target_os = "linux")]
     pub hide_k_threads: bool,
+
+    /// Whether the full command is split into name, working directory and
+    /// options (`processes.split_command`).
+    split_command: bool,
+
+    /// The names of the expanded groups in grouped mode with
+    /// `split_command`. Groups are collapsed by default.
+    expanded_groups: HashSet<String>,
 }
 
 impl ProcWidgetState {
@@ -466,9 +476,10 @@ impl ProcWidgetState {
             force_rerender: true,
             force_update_data: false,
             default_sort_index,
-            default_sort_order,
             #[cfg(target_os = "linux")]
             hide_k_threads: config.hide_k_threads,
+            split_command: table_config.split_command,
+            expanded_groups: HashSet::default(),
         };
         table.sort_table.set_data(table.column_text());
 
@@ -493,6 +504,30 @@ impl ProcWidgetState {
             .and_then(|index| self.table.columns.get(index))
             .map(|col| matches!(col.inner(), ProcColumn::MemPercent))
             .unwrap_or(false)
+    }
+
+    /// What the name/command column shows.
+    fn id_kind(&self) -> IdKind {
+        if !self.is_using_command() {
+            IdKind::Name
+        } else if self.split_command {
+            IdKind::SplitCommand
+        } else {
+            IdKind::Command
+        }
+    }
+
+    /// The name of the selected row's group, if it is the row of a group that
+    /// can expand (grouped mode with `split_command`).
+    fn current_group(&self) -> Option<String> {
+        if matches!(self.mode, ProcWidgetMode::Grouped) && self.id_kind() == IdKind::SplitCommand {
+            self.table
+                .current_item()
+                .filter(|process| process.num_similar > 1)
+                .map(|process| process.id.as_str().to_string())
+        } else {
+            None
+        }
     }
 
     fn get_query(&self) -> &Option<ProcessQuery> {
@@ -529,6 +564,7 @@ impl ProcWidgetState {
 
         let search_query = self.get_query();
         let is_using_command = self.is_using_command();
+        let id_kind = self.id_kind();
         let is_mem_percent = self.is_mem_percent();
 
         let ProcessData {
@@ -662,9 +698,9 @@ impl ProcWidgetState {
             .iter()
             .filter_map(|pid| {
                 if filtered_tree.contains_key(pid) {
-                    process_harvest.get(pid).map(|process| {
-                        ProcWidgetData::from_data(process, is_using_command, is_mem_percent)
-                    })
+                    process_harvest
+                        .get(pid)
+                        .map(|process| ProcWidgetData::from_data(process, id_kind, is_mem_percent))
                 } else {
                     None
                 }
@@ -697,9 +733,9 @@ impl ProcWidgetState {
                     let mut sum_queue = children_pids
                         .iter()
                         .filter_map(|child| {
-                            process_harvest.get(child).map(|p| {
-                                ProcWidgetData::from_data(p, is_using_command, is_mem_percent)
-                            })
+                            process_harvest
+                                .get(child)
+                                .map(|p| ProcWidgetData::from_data(p, id_kind, is_mem_percent))
                         })
                         .collect_vec();
 
@@ -708,9 +744,9 @@ impl ProcWidgetState {
 
                         if let Some(pids) = filtered_tree.get(&process.pid) {
                             sum_queue.extend(pids.iter().filter_map(|child| {
-                                process_harvest.get(child).map(|p| {
-                                    ProcWidgetData::from_data(p, is_using_command, is_mem_percent)
-                                })
+                                process_harvest
+                                    .get(child)
+                                    .map(|p| ProcWidgetData::from_data(p, id_kind, is_mem_percent))
                             }));
                         }
                     }
@@ -771,9 +807,9 @@ impl ProcWidgetState {
                     let mut children = children_pids
                         .iter()
                         .filter_map(|child_pid| {
-                            process_harvest.get(child_pid).map(|p| {
-                                ProcWidgetData::from_data(p, is_using_command, is_mem_percent)
-                            })
+                            process_harvest
+                                .get(child_pid)
+                                .map(|p| ProcWidgetData::from_data(p, id_kind, is_mem_percent))
                         })
                         .collect_vec();
 
@@ -802,7 +838,10 @@ impl ProcWidgetState {
     ) -> Vec<ProcWidgetData> {
         let search_query = self.get_query();
         let is_using_command = self.is_using_command();
+        let id_kind = self.id_kind();
         let is_mem_percent = self.is_mem_percent();
+        let is_grouped = matches!(self.mode, ProcWidgetMode::Grouped);
+        let has_expandable_groups = is_grouped && id_kind == IdKind::SplitCommand;
 
         let filtered_iter = process_harvest.values().filter(|process| {
             #[cfg(target_os = "linux")]
@@ -817,21 +856,21 @@ impl ProcWidgetState {
         });
 
         let mut id_pid_map: HashMap<String, Vec<Pid>> = HashMap::default();
-        let mut filtered_data: Vec<ProcWidgetData> = if let ProcWidgetMode::Grouped = self.mode {
-            let mut id_process_mapping: HashMap<&String, ProcWidgetData> = HashMap::default();
+        let mut filtered_data: Vec<ProcWidgetData> = if is_grouped {
+            let mut id_process_mapping: HashMap<&str, ProcWidgetData> = HashMap::default();
 
             for process in filtered_iter {
-                let id = if is_using_command {
-                    &process.command
-                } else {
-                    &process.name
+                let id: &str = match (id_kind, &process.split_command) {
+                    (IdKind::Name, _) => &process.name,
+                    (IdKind::SplitCommand, Some(split)) => &split.name,
+                    (IdKind::Command | IdKind::SplitCommand, _) => &process.command,
                 };
                 let pid = process.pid;
 
                 if let Some(entry) = id_pid_map.get_mut(id) {
                     entry.push(pid);
                 } else {
-                    id_pid_map.insert(id.clone(), vec![pid]);
+                    id_pid_map.insert(id.to_string(), vec![pid]);
                 }
 
                 if let Some(pwd) = id_process_mapping.get_mut(id) {
@@ -874,23 +913,63 @@ impl ProcWidgetState {
                 } else {
                     id_process_mapping.insert(
                         id,
-                        ProcWidgetData::from_data(process, is_using_command, is_mem_percent),
+                        ProcWidgetData::from_data(process, id_kind, is_mem_percent),
                     );
                 }
             }
 
-            id_process_mapping.into_values().collect()
+            id_process_mapping
+                .into_values()
+                .map(|data| {
+                    if has_expandable_groups && data.num_similar > 1 {
+                        let expanded = self.expanded_groups.contains(data.id.as_str());
+                        data.group_head(expanded)
+                    } else {
+                        data
+                    }
+                })
+                .collect()
         } else {
             filtered_iter
-                .map(|process| ProcWidgetData::from_data(process, is_using_command, is_mem_percent))
+                .map(|process| ProcWidgetData::from_data(process, id_kind, is_mem_percent))
                 .collect()
         };
 
-        self.id_pid_map = id_pid_map;
-
         if let Some(column) = self.table.columns.get(self.table.sort_index()) {
-            sort_skip_pid_asc(column.inner(), &mut filtered_data, self.table.order());
+            let order = self.table.order();
+            sort_skip_pid_asc(column.inner(), &mut filtered_data, order);
+
+            // Each expanded group's processes go under its row, in the same order.
+            if has_expandable_groups {
+                let mut rows = Vec::with_capacity(filtered_data.len());
+                for head in filtered_data {
+                    let member_pids = (head.num_similar > 1
+                        && self.expanded_groups.contains(head.id.as_str()))
+                    .then(|| id_pid_map.get(head.id.as_str()))
+                    .flatten();
+                    rows.push(head);
+
+                    if let Some(pids) = member_pids {
+                        let mut members = pids
+                            .iter()
+                            .filter_map(|pid| process_harvest.get(pid))
+                            .map(|process| {
+                                ProcWidgetData::from_data(process, id_kind, is_mem_percent)
+                            })
+                            .collect_vec();
+                        sort_skip_pid_asc(column.inner(), &mut members, order);
+
+                        let last = members.len().saturating_sub(1);
+                        rows.extend(members.into_iter().enumerate().map(|(index, member)| {
+                            member.group_member(if index == last { "└─ " } else { "├─ " })
+                        }));
+                    }
+                }
+                filtered_data = rows;
+            }
         }
+
+        self.id_pid_map = id_pid_map;
 
         filtered_data
     }
@@ -994,6 +1073,9 @@ impl ProcWidgetState {
         {
             collapsed.collapse(process.pid);
             self.force_data_update();
+        } else if let Some(group) = self.current_group() {
+            self.expanded_groups.remove(&group);
+            self.force_data_update();
         }
     }
 
@@ -1003,6 +1085,9 @@ impl ProcWidgetState {
         {
             collapsed.expand(process.pid);
             self.force_data_update();
+        } else if let Some(group) = self.current_group() {
+            self.expanded_groups.insert(group);
+            self.force_data_update();
         }
     }
 
@@ -1011,6 +1096,11 @@ impl ProcWidgetState {
             && let Some(process) = self.table.current_item()
         {
             collapsed.toggle(process.pid);
+            self.force_data_update();
+        } else if let Some(group) = self.current_group() {
+            if !self.expanded_groups.remove(&group) {
+                self.expanded_groups.insert(group);
+            }
             self.force_data_update();
         }
     }
@@ -1207,6 +1297,7 @@ mod test {
             #[cfg(not(target_family = "unix"))]
             user: Some("N/A".into()),
             num_similar: 0,
+            is_group_member: false,
             disabled: false,
             time: Duration::from_secs(0),
             #[cfg(feature = "gpu")]

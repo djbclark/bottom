@@ -1194,15 +1194,15 @@
             }
           ]
         },
-        "tree_collapse": {
-          "description": "Collapse the process tree by default when tree mode is set.",
+        "split_command": {
+          "description": "When a full command is shown, splits it into the command name, the\nworking directory and the options. Grouped processes then expand to\nshow each process.",
           "type": [
             "boolean",
             "null"
           ]
         },
-        "truncate_cmd_middle": {
-          "description": "When a full command is shown, cuts one that is too wide in the middle (`[...]`) instead of the end.",
+        "tree_collapse": {
+          "description": "Collapse the process tree by default when tree mode is set.",
           "type": [
             "boolean",
             "null"

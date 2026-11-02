@@ -14,57 +14,53 @@ pub fn truncate_to_text<'a, U: Into<usize>>(content: &str, width: U) -> Text<'a>
     Text::raw(truncate_str(content, width.into()).to_string())
 }
 
-/// Truncates text that is wider than `width` cells by replacing its middle with
-/// `[...]`, so that both the start and the end are kept. Text that already fits
-/// is returned untouched.
-///
-/// If `width` is too small to keep anything on both sides of the marker, this
-/// falls back to [`truncate_str`] (cut at the end, with an ellipsis).
-pub fn truncate_middle(content: &str, width: usize) -> Cow<'_, str> {
-    const MARKER: &str = "[...]";
-    const MARKER_WIDTH: usize = MARKER.len();
+/// The single-character ellipsis that marks cut text.
+pub const ELLIPSIS: &str = "…";
 
-    if UnicodeWidthStr::width(content) <= width {
-        return Cow::Borrowed(content);
-    }
-
-    if width < MARKER_WIDTH + 2 {
-        return truncate_str(content, width);
-    }
-
-    // The head and tail budgets add up to less than the content's width, so
-    // the kept head and tail can never overlap.
-    let budget = width - MARKER_WIDTH;
-    let head_budget = budget.div_ceil(2);
-    let tail_budget = budget / 2;
-
-    let mut head_end = 0;
+/// The longest start of `content` that is at most `width` cells wide.
+fn head_within(content: &str, width: usize) -> &str {
+    let mut end = 0;
     let mut used = 0;
     for (idx, grapheme) in content.grapheme_indices(true) {
         let grapheme_width = UnicodeWidthStr::width(grapheme);
-        if used + grapheme_width > head_budget {
+        if used + grapheme_width > width {
             break;
         }
         used += grapheme_width;
-        head_end = idx + grapheme.len();
+        end = idx + grapheme.len();
+    }
+    &content[..end]
+}
+
+/// Truncates a path that is wider than `width` cells by replacing part of its
+/// middle with [`ELLIPSIS`]. The last component is kept whole if it fits (it
+/// takes precedence), and as much of the start as fits comes before it, e.g.
+/// `~/src/djbclar…/scripts`. A path that fits is returned untouched.
+///
+/// If even the last component does not fit, that is all that is shown, cut at
+/// its end. A path with one component is cut at its end.
+pub fn truncate_path(path: &str, width: usize) -> Cow<'_, str> {
+    if UnicodeWidthStr::width(path) <= width {
+        return Cow::Borrowed(path);
     }
 
-    let mut tail_start = content.len();
-    used = 0;
-    for (idx, grapheme) in content.grapheme_indices(true).rev() {
-        let grapheme_width = UnicodeWidthStr::width(grapheme);
-        if used + grapheme_width > tail_budget {
-            break;
-        }
-        used += grapheme_width;
-        tail_start = idx;
-    }
+    let last_start = match path.trim_end_matches('/').rfind('/') {
+        Some(index) if index > 0 => index,
+        _ => return truncate_str(path, width),
+    };
+    // Starts with the `/` before the last component.
+    let tail = &path[last_start..];
+    let tail_width = UnicodeWidthStr::width(tail);
 
-    Cow::Owned(concat_string!(
-        &content[..head_end],
-        MARKER,
-        &content[tail_start..]
-    ))
+    if tail_width + ELLIPSIS.width() < width {
+        let head = head_within(path, width - ELLIPSIS.width() - tail_width);
+        Cow::Owned(concat_string!(head, ELLIPSIS, tail))
+    } else if width == 0 {
+        Cow::Borrowed("")
+    } else {
+        let last = truncate_str(&tail[1..], width - ELLIPSIS.width());
+        Cow::Owned(concat_string!(ELLIPSIS, last))
+    }
 }
 
 /// Checks that the first string is equal to any of the other ones in a ASCII
@@ -95,7 +91,7 @@ macro_rules! multi_eq_ignore_ascii_case {
 mod tests {
     use unicode_width::UnicodeWidthStr;
 
-    use super::truncate_middle;
+    use super::truncate_path;
 
     #[test]
     fn test_multi_eq_ignore_ascii_case() {
@@ -126,37 +122,42 @@ mod tests {
         );
     }
 
+    const PATH: &str = "~/src/djbclark-ade/skills/bottom-config/scripts";
+
     #[test]
-    fn test_truncate_middle_fits() {
-        assert_eq!(truncate_middle("abc", 5), "abc");
-        assert_eq!(truncate_middle("abcde", 5), "abcde");
+    fn test_truncate_path_fits() {
+        assert_eq!(truncate_path(PATH, PATH.len()), PATH);
     }
 
     #[test]
-    fn test_truncate_middle_keeps_both_ends() {
-        let cmd = "/usr/local/bin/some-very-long-command --flag";
-        let result = truncate_middle(cmd, 20);
-        assert_eq!(result, "/usr/loc[...] --flag");
-        assert_eq!(UnicodeWidthStr::width(result.as_ref()), 20);
+    fn test_truncate_path_keeps_last_component_and_start() {
+        let result = truncate_path(PATH, 22);
+        assert_eq!(result, "~/src/djbclar…/scripts");
+        assert_eq!(UnicodeWidthStr::width(result.as_ref()), 22);
+
+        // One cell more than the last component and the ellipsis keeps one
+        // character of the start.
+        assert_eq!(truncate_path(PATH, 10), "~…/scripts");
     }
 
     #[test]
-    fn test_truncate_middle_narrow_falls_back_to_end() {
-        for width in 0..7 {
-            let result = truncate_middle("abcdefghij", width);
-            assert!(
-                UnicodeWidthStr::width(result.as_ref()) <= width,
-                "width {width} gave {result:?}"
-            );
-            assert!(!result.contains("[...]"), "width {width} gave {result:?}");
-        }
+    fn test_truncate_path_last_component_too_wide() {
+        assert_eq!(truncate_path(PATH, 9), "…scripts");
+        assert_eq!(truncate_path(PATH, 5), "…scr…");
+        assert_eq!(truncate_path(PATH, 1), "…");
+        assert_eq!(truncate_path(PATH, 0), "");
     }
 
     #[test]
-    fn test_truncate_middle_wide_characters() {
-        // Each character is 2 cells wide; a 5-cell budget side keeps 2 of them.
-        let result = truncate_middle("日本語日本語日本語日本語", 15);
-        assert_eq!(result, "日本[...]本語");
-        assert!(UnicodeWidthStr::width(result.as_ref()) <= 15);
+    fn test_truncate_path_one_component_is_cut_at_end() {
+        assert_eq!(truncate_path("/Applications", 6), "/Appl…");
+    }
+
+    #[test]
+    fn test_truncate_path_wide_characters() {
+        // Each character is 2 cells wide.
+        let result = truncate_path("/日本語日本語/日本", 12);
+        assert_eq!(result, "/日本…/日本");
+        assert!(UnicodeWidthStr::width(result.as_ref()) <= 12);
     }
 }

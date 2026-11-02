@@ -10,7 +10,7 @@ If you want to change some of the default behaviour of the processes widget, you
 | `hide_k_threads`        | Boolean | Hide kernel threads from being shown. Linux only.                                                         |
 | `tree_collapse`         | Boolean | Collapse the process tree by default when tree mode is set.                                               |
 | `process_command`       | Boolean | Shows the full command name instead of the process name by default.                                       |
-| `truncate_cmd_middle`   | Boolean | When a full command is shown, cuts one that is too wide in the middle (`[...]`) instead of the end.       |
+| `split_command`         | Boolean | When a full command is shown, splits it into name, working directory and options. See below.              |
 | `disable_advanced_kill` | Boolean | Disable the advanced kill dialog and just show the basic one with no options. Linux, macOS, FreeBSD only. |
 | `default_memory_value`  | Boolean | Defaults to showing process memory usage by value.                                                        |
 | `default_grouped`       | Boolean | Groups processes with the same name by default. No effect if `--tree` is set.                             |
@@ -55,3 +55,30 @@ You can also set the default order by changing `processes.sort_order` with `"Asc
 [processes]
 sort_order = "Ascending"
 ```
+
+## Split Command
+
+With `split_command = true`, a full command (`process_command`, or `P`) is shown in three parts, separated by `┊` in the
+selected border colour: the command name, the working directory, and the options.
+
+```toml
+[processes]
+process_command = true
+split_command = true
+```
+
+- The command name is the executable's file name. For a script interpreter (`python`, `node`, `bun`, `deno`, `ruby`,
+  `perl`, `php`, shells, ...) it is the interpreter followed by the script's file name, e.g. `python3.15 s1_search.py`
+  (or the module, for `python -m`).
+- The working directory shows your home directory as `~`. A process whose directory cannot be read (usually one of
+  another user, unless bottom runs as root) shows a dim `?`.
+- The options are the remaining arguments; ones with spaces or quotes are single-quoted.
+
+When the column is too narrow, the name is kept whole; the options keep at least 10 cells; the working directory is cut
+in the middle with `…`, keeping its last directory whole and as much of its start as fits; the options are cut at the
+end with `…`.
+
+In grouped mode (`Tab`), processes are grouped by this command name. A group of more than one process starts collapsed
+(`+`); expand it (`-`) with `Right`, `Space` or `-` to list each process with its own working directory and options,
+and collapse it with `Left`, `Space` or `-`. Killing a group's row kills all its processes; killing a row under it
+kills just that process.
