@@ -114,7 +114,8 @@ fn script_index(interpreter: &Interpreter, args: &[&str]) -> Option<usize> {
         if arg == "--" {
             return (index + 1 < args.len()).then_some(index + 1);
         }
-        if interpreter.inline_options.contains(&arg) {
+        // `-` is a script read from standard input: there is no file name.
+        if arg == "-" || interpreter.inline_options.contains(&arg) {
             return None;
         }
         if interpreter.module_options.contains(&arg) {
@@ -320,6 +321,11 @@ mod tests {
         let parts = split(&["bash", "-c", "echo hi\nsleep 1"]);
         assert_eq!(parts.name, "bash");
         assert_eq!(parts.args, "-c 'echo hi sleep 1'");
+
+        // A script read from standard input has no file name.
+        let parts = split(&["python3", "-", "100.124.55.39", "8022"]);
+        assert_eq!(parts.name, "python3");
+        assert_eq!(parts.args, "- 100.124.55.39 8022");
 
         // A login shell has no script.
         let parts = split(&["-zsh"]);
