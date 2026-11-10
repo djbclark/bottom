@@ -44,6 +44,7 @@ Note that key bindings are generally case-sensitive.
 | ++q++, ++Q++, ++ctrl+c++                                     | Quit                                                         |
 | ++esc++                                                      | Close dialog windows, search, widgets, or exit expanded mode |
 | ++ctrl+r++                                                   | Reset display and any collected data                         |
+| ++f8++ | Set resource averaging window; Enter applies, Esc cancels, 0 disables |
 | ++f++                                                        | Freeze/unfreeze updating with new data                       |
 | ++question++                                                 | Open help menu                                               |
 | ++e++                                                        | Toggle expanding the currently selected widget               |

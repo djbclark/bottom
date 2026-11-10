@@ -188,3 +188,14 @@ fn test_help() {
     btm_command(&["--help"]).assert().success();
     btm_command(&["-h"]).assert().success();
 }
+
+#[test]
+fn test_invalid_average() {
+    no_cfg_btm_command()
+        .args(["--average", "invalid"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "'--average' was set with an invalid value",
+        ));
+}

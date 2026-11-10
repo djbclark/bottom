@@ -97,6 +97,14 @@ pub struct BottomArgs {
 pub struct GeneralArgs {
     #[arg(
         long,
+        value_name = "TIME",
+        help = "Average resource usage over a sliding window.",
+        long_help = "Average resource usage over a sliding window. Accepts milliseconds or a human duration (e.g. 5s, 5m, 34h). Zero disables averaging. Press F8 to change this while running."
+    )]
+    pub average: Option<String>,
+
+    #[arg(
+        long,
         action = ArgAction::SetTrue,
         help = "Temporarily shows the time scale in graphs.",
         long_help = "Automatically hides the time scale in graphs after being shown for a brief moment when zoomed \

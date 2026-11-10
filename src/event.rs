@@ -53,6 +53,13 @@ pub fn handle_mouse_event(event: MouseEvent, app: &mut App) {
 pub fn handle_key_event_or_break(
     event: KeyEvent, app: &mut App, reset_sender: &Sender<CollectionThreadEvent>,
 ) -> bool {
+    // The editor owns all keys so text cannot also trigger a process action.
+    if app.average_input.is_some() {
+        if event.modifiers.is_empty() || event.modifiers == KeyModifiers::SHIFT {
+            app.edit_average(event.code);
+        }
+        return false;
+    }
     // c_debug!("KeyEvent: {event:?}");
 
     if event.modifiers.is_empty() {
@@ -76,6 +83,7 @@ pub fn handle_key_event_or_break(
             KeyCode::F(3) => app.toggle_search_regex(),
             KeyCode::F(5) => app.toggle_tree_mode(),
             KeyCode::F(6) => app.toggle_sort_menu(),
+            KeyCode::F(8) => app.open_average_editor(),
             KeyCode::F(9) => app.kill_current_process(),
             KeyCode::PageDown => app.on_page_down(),
             KeyCode::PageUp => app.on_page_up(),

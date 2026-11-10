@@ -480,6 +480,16 @@
             "null"
           ]
         },
+        "average": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StringOrNum"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "average_cpu_row": {
           "type": [
             "boolean",
@@ -1556,12 +1566,12 @@
           "const": "pipe"
         },
         {
-          "description": "Fill bars with block characters (`█`, `▉`, etc.).",
+          "description": "Fill bars with block characters (`\u2588`, `\u2589`, etc.).",
           "type": "string",
           "const": "block"
         },
         {
-          "description": "Fill bars with square characters (`■`).",
+          "description": "Fill bars with square characters (`\u25a0`).",
           "type": "string",
           "const": "square"
         }
