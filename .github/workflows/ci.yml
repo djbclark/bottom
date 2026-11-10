@@ -37,6 +37,8 @@ jobs:
           assert any('--average' in p.read_text() for p in Path('target/generated/man').glob('*'))
           assert any('--average' in p.read_text() for p in Path('target/generated/completion').glob('*'))
           CHECK
+      - name: Exercise live TUI duration editor
+        run: python3 .github/ci/averaging_smoke.py
       - uses: actions/upload-artifact@v4
         with:
           name: averaging-linux
