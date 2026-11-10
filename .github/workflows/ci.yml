@@ -20,6 +20,8 @@ jobs:
         with:
           components: rustfmt,clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - run: cargo fmt --all -- --check
       - run: cargo test --locked --all-features
       - run: cargo test --locked --no-default-features
@@ -34,7 +36,8 @@ jobs:
           python3 - <<'CHECK'
           from pathlib import Path
           assert '--average' in Path('target/generated/help.txt').read_text()
-          assert any('--average' in p.read_text() for p in Path('target/generated/man').glob('*'))
+          # Roff renders option hyphens as escaped hyphens; normalize before checking.
+          assert any('--average' in p.read_text().replace(r'\-', '-') for p in Path('target/generated/man').glob('*'))
           assert any('--average' in p.read_text() for p in Path('target/generated/completion').glob('*'))
           CHECK
       - name: Exercise live TUI duration editor
