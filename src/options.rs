@@ -1725,6 +1725,33 @@ mod test {
         super::init_app(args, config).unwrap().0
     }
 
+    #[test]
+    fn average_editor_applies_cancels_and_rejects_invalid_input() {
+        use crossterm::event::KeyCode;
+        let mut app = create_app(BottomArgs::parse_from(["btm", "--average", "5m"]));
+        app.open_average_editor();
+        app.edit_average(KeyCode::Char('q'));
+        app.edit_average(KeyCode::Enter);
+        assert!(app.average_input_error);
+        assert_eq!(app.app_config_fields.average, Duration::from_secs(300));
+        app.edit_average(KeyCode::Esc);
+        assert!(app.average_input.is_none());
+        app.open_average_editor();
+        for c in "34h".chars() {
+            app.edit_average(KeyCode::Char(c));
+        }
+        app.edit_average(KeyCode::Enter);
+        assert!(app.average_input.is_none());
+        assert_eq!(
+            app.app_config_fields.average,
+            Duration::from_secs(34 * 3600)
+        );
+        app.open_average_editor();
+        app.handle_paste("0".to_string());
+        app.edit_average(KeyCode::Enter);
+        assert_eq!(app.app_config_fields.average, Duration::ZERO);
+    }
+
     // TODO: There's probably a better way to create clap options AND unify
     // together to avoid the possibility of typos/mixing up. Use proc macros
     // to unify on one struct?

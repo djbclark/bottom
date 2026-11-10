@@ -199,3 +199,14 @@ fn test_invalid_average() {
             "'--average' was set with an invalid value",
         ));
 }
+
+#[test]
+fn test_average_overflow() {
+    no_cfg_btm_command()
+        .args(["--average", "18446744073709551616"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "'--average' was set with an invalid value",
+        ));
+}
