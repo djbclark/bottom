@@ -3,7 +3,7 @@ pub mod filter;
 pub mod layout_manager;
 pub mod states;
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use data::*;
 use filter::*;
@@ -40,6 +40,7 @@ pub enum AxisScaling {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct AppConfigFields {
     pub update_rate: u64,
+    pub average: Duration,
     pub temperature_type: TemperatureType,
     pub use_dot: bool,
     pub cpu_left_legend: bool,
@@ -119,6 +120,8 @@ impl Default for TerminalFeatures {
 }
 
 pub struct App {
+    pub(crate) average_input: Option<String>,
+    pub(crate) average_input_error: bool,
     awaiting_second_char: bool,
     second_char: Option<char>,
     pub data_store: DataStore,
@@ -139,6 +142,45 @@ pub struct App {
 }
 
 impl App {
+    pub(crate) fn open_average_editor(&mut self) {
+        if !self.is_in_dialog() && !self.is_in_any_search() {
+            self.average_input = Some(String::new());
+            self.average_input_error = false;
+            self.is_force_redraw = true;
+        }
+    }
+
+    pub(crate) fn edit_average(&mut self, key: crossterm::event::KeyCode) {
+        use crossterm::event::KeyCode;
+        let Some(input) = &mut self.average_input else {
+            return;
+        };
+        match key {
+            KeyCode::Esc => {
+                self.average_input = None;
+            }
+            KeyCode::Backspace => {
+                input.pop();
+                self.average_input_error = false;
+            }
+            KeyCode::Char(c) if !c.is_control() && input.len() < 128 => {
+                input.push(c);
+                self.average_input_error = false;
+            }
+            KeyCode::Enter => match crate::options::parse_average_duration(input) {
+                Ok(duration) => {
+                    self.app_config_fields.average = duration;
+                    self.average_input = None;
+                    // Switching modes starts fresh: no invented history or mixed graph points.
+                    self.data_store.reset();
+                }
+                Err(()) => self.average_input_error = true,
+            },
+            _ => {}
+        }
+        self.is_force_redraw = true;
+    }
+
     /// Create a new [`App`].
     pub fn new(
         app_config_fields: AppConfigFields, states: AppWidgetStates,
@@ -149,6 +191,8 @@ impl App {
         data_store.set_filters(filters.clone());
 
         Self {
+            average_input: None,
+            average_input_error: false,
             awaiting_second_char: false,
             second_char: None,
             data_store,
@@ -2417,6 +2461,18 @@ impl App {
 
     /// A quick and dirty way to handle paste events.
     pub fn handle_paste(&mut self, paste: String) {
+        if let Some(input) = &mut self.average_input {
+            input.extend(
+                paste
+                    .chars()
+                    .filter(|c| !c.is_control())
+                    .take(128usize.saturating_sub(input.len())),
+            );
+            self.average_input_error = false;
+            self.is_force_redraw = true;
+            return;
+        }
+
         if self.ignore_normal_keybinds() {
             return;
         }

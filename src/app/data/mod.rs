@@ -11,3 +11,5 @@ pub use store::*;
 
 mod temperature;
 pub use temperature::*;
+
+mod average;

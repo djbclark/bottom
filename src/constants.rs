@@ -26,11 +26,12 @@ const HELP_CONTENTS_TEXT: [&str; 12] = [
 ];
 
 // TODO [Help]: Move to using tables for easier formatting?
-pub(crate) const GENERAL_HELP_TEXT: [&str; 24] = [
+pub(crate) const GENERAL_HELP_TEXT: [&str; 25] = [
     "1 - General",
     "q, Q, Ctrl-c            Quit",
     "Esc                     Close dialog windows, search, widgets, or exit expanded mode",
     "Ctrl-r                  Reset display and any collected data",
+    "F8                      Set sliding averaging window (5s, 5m, 34h; 0 disables)",
     "f                       Freeze/unfreeze updating with new data",
     "Shift/Ctrl-Left, H, A   Move widget selection left",
     "Shift/Ctrl-Right, L, D  Move widget selection right",

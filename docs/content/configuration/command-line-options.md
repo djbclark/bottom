@@ -111,3 +111,14 @@ see information on these options by running `btm -h`, or run `btm --help` to dis
 | ----------------- | ------------------------------------------------- |
 | `-h`, `--help`    | Prints help info (for more details use `--help`.) |
 | `-V`, `--version` | Prints version information.                       |
+
+### Sliding averages
+
+Use `--average TIME`, for example `btm --average 5m`, to average resource
+measurements over a trailing duration. `TIME` accepts milliseconds or human
+units (`5s`, `5m`, `34h`), like `--rate`; `0` disables averaging. Press F8 to
+change it while running. See [sliding resource averages](config-file/flags.md#sliding-resource-averages)
+for measurement semantics and memory costs.
+
+The man page and shell completions are generated from the same argument
+specification as `--help` when building with `BTM_GENERATE=1`.

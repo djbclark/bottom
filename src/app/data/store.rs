@@ -76,6 +76,7 @@ pub struct InnerData {
     // FIXME: (points_rework_v1) we could be able to remove this with some more
     // refactoring.
     last_update_time: Instant,
+    averages: super::average::ResourceAverages,
 
     pub(crate) time_series_data: TimeSeriesData,
     pub(crate) network_harvest: NetworkHarvest,
@@ -106,6 +107,7 @@ impl Default for InnerData {
     fn default() -> Self {
         InnerData {
             last_update_time: Instant::now(),
+            averages: Default::default(),
             time_series_data: TimeSeriesData::default(),
             network_harvest: NetworkHarvest::default(),
             ram_harvest: None,
@@ -139,6 +141,7 @@ impl InnerData {
         filters: &DataFilters,
     ) {
         let harvested_time = data.collection_time;
+        self.averages.apply(&mut data, settings.average);
 
         // We must adjust all the network values to their selected type
         // (defaults to bits).
@@ -217,6 +220,9 @@ impl InnerData {
         {
             self.eat_disks(disks, io, harvested_time, settings.disk_use_binary_prefix);
 
+            self.averages
+                .apply_disks(&mut self.disk_harvest, harvested_time, settings.average);
+
             if used_widgets.use_disk_io_graph {
                 self.time_series_data.update_disk_io(
                     &self.disk_harvest,
@@ -238,6 +244,7 @@ impl InnerData {
         }
 
         // And we're done eating. Update time and push the new entry!
+        self.averages.finish(harvested_time);
         self.last_update_time = harvested_time;
     }
 

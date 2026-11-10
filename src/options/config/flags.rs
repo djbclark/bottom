@@ -29,6 +29,7 @@ impl TableGap {
 pub(crate) struct GeneralConfig {
     pub(crate) dot_marker: Option<bool>,
     pub(crate) rate: Option<StringOrNum>,
+    pub(crate) average: Option<StringOrNum>,
     pub(crate) basic: Option<bool>,
     pub(crate) default_time_value: Option<StringOrNum>,
     pub(crate) time_delta: Option<StringOrNum>,

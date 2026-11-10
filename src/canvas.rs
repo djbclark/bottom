@@ -84,13 +84,42 @@ impl Painter {
         )
     }
 
+    fn draw_status(&self, f: &mut Frame<'_>, area: Rect, app: &App) {
+        if let Some(input) = &app.average_input {
+            let error = if app.average_input_error {
+                "Invalid duration. "
+            } else {
+                ""
+            };
+            f.render_widget(
+                Paragraph::new(format!(
+                    "{error}Average: {input}_  Enter: apply, Esc: cancel (0: off)"
+                )),
+                area,
+            );
+        } else if app.data_store.is_frozen() {
+            self.draw_frozen_indicator(f, area);
+        } else {
+            f.render_widget(
+                Paragraph::new(format!(
+                    "Average: {} (observed history); F8: change",
+                    humantime::format_duration(app.app_config_fields.average)
+                )),
+                area,
+            );
+        }
+    }
+
     pub fn draw_data<B: Backend>(
         &mut self, terminal: &mut Terminal<B>, app_state: &mut App,
     ) -> Result<(), B::Error> {
         use BottomWidgetType::*;
 
         terminal.draw(|f| {
-            let (terminal_size, frozen_draw_loc) = if app_state.data_store.is_frozen() {
+            let (terminal_size, frozen_draw_loc) = if app_state.data_store.is_frozen()
+                || !app_state.app_config_fields.average.is_zero()
+                || app_state.average_input.is_some()
+            {
                 // TODO: Remove built-in cache?
                 let split_loc = Layout::default()
                     .constraints([Constraint::Min(0), Constraint::Length(1)])
@@ -228,7 +257,7 @@ impl Painter {
                     .draw(f, dialog_draw_area, &self.styles);
             } else if app_state.is_expanded {
                 if let Some(frozen_draw_loc) = frozen_draw_loc {
-                    self.draw_frozen_indicator(f, frozen_draw_loc);
+                    self.draw_status(f, frozen_draw_loc, app_state);
                 }
 
                 let rect = Layout::default()
@@ -297,7 +326,7 @@ impl Painter {
                 // Basic mode. This basically removes all graphs but otherwise
                 // the same info.
                 if let Some(frozen_draw_loc) = frozen_draw_loc {
-                    self.draw_frozen_indicator(f, frozen_draw_loc);
+                    self.draw_status(f, frozen_draw_loc, app_state);
                 }
 
                 let data = app_state.data_store.get_data();
@@ -425,7 +454,7 @@ impl Painter {
             } else {
                 // Draws using the passed in (or default) layout.
                 if let Some(frozen_draw_loc) = frozen_draw_loc {
-                    self.draw_frozen_indicator(f, frozen_draw_loc);
+                    self.draw_status(f, frozen_draw_loc, app_state);
                 }
 
                 // A two-pass algorithm - get layouts using constraints (first

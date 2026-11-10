@@ -60,3 +60,35 @@ each time:
 | `no_write`                   | Boolean                                                                                                            | Disables writing to the config file.                                                                                                                                             |
 | `hide_k_threads`             | Boolean                                                                                                            | Deprecated - use `processes.hide_k_threads`. Hide kernel threads from being shown.                                                                                               |
 | `free_arc`                   | Boolean                                                                                                            | Deprecated - use `memory.free_arc`. Subtract ARC memory that can be freed from memory usage.                                                                                     |
+
+## Sliding resource averages
+
+Set `average = "5m"` under `[flags]` to display time-weighted resource usage over
+that trailing window. The equivalent command is `btm --average 5m`; the command
+line takes precedence. Like `rate`, it accepts milliseconds or human durations,
+including `5s`, `5m` and `34h`. The default is `0` (disabled).
+
+Press **F8** to enter a new duration while running, **Enter** to apply it, or
+**Esc** to cancel. Enter `0` to return to live measurements. Changes are temporary;
+edit the config to persist them. Applying a duration resets displayed history.
+
+Averaging affects CPU usage, process memory and I/O rates, system memory,
+network rates, disk usage and I/O rates, temperatures, GPU memory/utilization,
+and battery charge/power. Process sorting, grouping and tree totals use the same
+averaged measurements. Names, IDs, states, priorities, capacities, cumulative
+counters, uptime and the kernel's existing load averages remain current.
+Graphs record these averaged measurements, rather than rewriting old points.
+
+Each collected value represents the interval ending at its timestamp. Intervals
+are weighted by elapsed monotonic time and clipped at the window boundary.
+Until enough history exists, only observed intervals are used; no earlier data
+is invented. New processes start fresh, exited processes disappear, and reused
+PIDs are distinguished by their start timestamp. Missing series start fresh when
+they return. The first observation is displayed directly until an interval exists.
+
+History is collected only while averaging is enabled. Memory use grows with the
+number of active measurements and the window divided by the refresh interval;
+long windows on busy systems can use substantial memory. Consecutive identical
+samples are compressed, and disappeared measurements are removed. Shorten the
+window or increase `rate` if needed. This is an exact trailing window, not
+exponential smoothing.

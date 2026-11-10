@@ -136,6 +136,7 @@ pub(crate) trait UnixProcessExt {
 
             process_vector.push(ProcessHarvest {
                 pid,
+                start_time: process_val.start_time(),
                 parent_pid: Self::parent_pid(process_val),
                 name,
                 command,
