@@ -1039,7 +1039,7 @@ fn get_update_rate(args: &BottomArgs, config: &Config) -> OptionResult<u64> {
 }
 
 fn get_average(args: &BottomArgs, config: &Config) -> OptionResult<Duration> {
-    let milliseconds = parse_ms_option!(
+    let milliseconds: OptionResult<u64> = parse_ms_option!(
         &args.general.average,
         config
             .flags
@@ -1049,8 +1049,8 @@ fn get_average(args: &BottomArgs, config: &Config) -> OptionResult<Duration> {
         "average",
         None,
         None,
-    )?;
-    Ok(Duration::from_millis(milliseconds))
+    );
+    Ok(Duration::from_millis(milliseconds?))
 }
 
 /// Shared by the CLI/config and the interactive averaging editor.
