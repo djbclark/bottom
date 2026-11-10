@@ -288,6 +288,7 @@ fn read_proc(
     Ok((
         ProcessHarvest {
             pid: process.pid,
+            start_time: stat.start_time,
             parent_pid,
             cpu_usage_percent,
             mem_usage_percent,

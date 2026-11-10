@@ -457,6 +457,7 @@ pub(crate) fn init_app(args: BottomArgs, config: Config) -> Result<(App, BottomL
     // TODO: Can probably just reuse the options struct.
     let app_config_fields = AppConfigFields {
         update_rate: get_update_rate(args, config)?,
+        average: get_average(args, config)?,
         temperature_type: get_temperature(args, config)
             .context("Update 'temperature_type' in your config file.")?,
         show_average_cpu: get_show_average_cpu(args, config),
@@ -739,7 +740,8 @@ pub(crate) fn init_app(args: BottomArgs, config: Config) -> Result<(App, BottomL
                             battery_state_map
                                 .insert(widget.widget_id, BatteryWidgetState::default());
                         }
-                        // FIXME: This is kind of a hack that we have these cases at all.
+                        // FIXME: This is kind of a hack that we have these
+                        // cases at all.
                         Empty | BasicCpu | BasicMem | BasicNet | BasicTables | CpuLegend
                         | ProcSort | ProcSearch => {}
                     }
@@ -1040,6 +1042,26 @@ fn get_update_rate(args: &BottomArgs, config: &Config) -> OptionResult<u64> {
         Some(250),
         None,
     )
+}
+
+fn get_average(args: &BottomArgs, config: &Config) -> OptionResult<Duration> {
+    let milliseconds: OptionResult<u64> = parse_ms_option!(
+        &args.general.average,
+        config
+            .flags
+            .as_ref()
+            .and_then(|flags| flags.average.as_ref()),
+        0,
+        "average",
+        None,
+        None,
+    );
+    Ok(Duration::from_millis(milliseconds?))
+}
+
+/// Shared by the CLI/config and the interactive averaging editor.
+pub(crate) fn parse_average_duration(value: &str) -> Result<Duration, ()> {
+    try_parse_ms(value).map(Duration::from_millis)
 }
 
 fn get_temperature(args: &BottomArgs, config: &Config) -> OptionResult<TemperatureType> {
@@ -1462,6 +1484,38 @@ mod test {
     };
 
     #[test]
+    fn average_duration_options() {
+        let mut config = Config::default();
+        let args = BottomArgs::parse_from(["btm"]);
+        assert_eq!(get_average(&args, &config), Ok(Duration::ZERO));
+        config.flags = Some(GeneralConfig {
+            average: Some("5m".to_string().into()),
+            ..Default::default()
+        });
+        assert_eq!(get_average(&args, &config), Ok(Duration::from_secs(300)));
+        for (text, milliseconds) in [
+            ("5s", 5000),
+            ("5m", 300000),
+            ("34h", 122400000),
+            ("1500", 1500),
+            ("0", 0),
+        ] {
+            let args = BottomArgs::parse_from(["btm", "--average", text]);
+            assert_eq!(
+                get_average(&args, &config),
+                Ok(Duration::from_millis(milliseconds))
+            );
+            assert_eq!(
+                parse_average_duration(text),
+                Ok(Duration::from_millis(milliseconds))
+            );
+        }
+        for text in ["-1", "", "invalid", "18446744073709551616"] {
+            assert!(parse_average_duration(text).is_err());
+        }
+    }
+
+    #[test]
     fn verify_try_parse_ms() {
         let a = "100s";
         let b = "100";
@@ -1675,6 +1729,33 @@ mod test {
     fn create_app(args: BottomArgs) -> App {
         let config = Config::default();
         super::init_app(args, config).unwrap().0
+    }
+
+    #[test]
+    fn average_editor_applies_cancels_and_rejects_invalid_input() {
+        use crossterm::event::KeyCode;
+        let mut app = create_app(BottomArgs::parse_from(["btm", "--average", "5m"]));
+        app.open_average_editor();
+        app.edit_average(KeyCode::Char('q'));
+        app.edit_average(KeyCode::Enter);
+        assert!(app.average_input_error);
+        assert_eq!(app.app_config_fields.average, Duration::from_secs(300));
+        app.edit_average(KeyCode::Esc);
+        assert!(app.average_input.is_none());
+        app.open_average_editor();
+        for c in "34h".chars() {
+            app.edit_average(KeyCode::Char(c));
+        }
+        app.edit_average(KeyCode::Enter);
+        assert!(app.average_input.is_none());
+        assert_eq!(
+            app.app_config_fields.average,
+            Duration::from_secs(34 * 3600)
+        );
+        app.open_average_editor();
+        app.handle_paste("0".to_string());
+        app.edit_average(KeyCode::Enter);
+        assert_eq!(app.app_config_fields.average, Duration::ZERO);
     }
 
     // TODO: There's probably a better way to create clap options AND unify

@@ -73,7 +73,8 @@ pub struct TotalNetworkData {
 /// through DataStore?
 #[derive(Debug, Clone)]
 pub struct InnerData {
-    // FIXME: (points_rework_v1) we could be able to remove this with some more refactoring.
+    // FIXME: (points_rework_v1) we could be able to remove this with some more
+    // refactoring.
     last_update_time: Instant,
 
     pub(crate) time_series_data: TimeSeriesData,
@@ -135,9 +136,10 @@ impl InnerData {
     )]
     fn eat_data(
         &mut self, mut data: Box<Data>, settings: &AppConfigFields, used_widgets: &UsedWidgets,
-        filters: &DataFilters,
+        filters: &DataFilters, averages: &mut super::average::ResourceAverages,
     ) {
         let harvested_time = data.collection_time;
+        averages.apply(&mut data, settings.average);
 
         // We must adjust all the network values to their selected type
         // (defaults to bits).
@@ -216,6 +218,8 @@ impl InnerData {
         {
             self.eat_disks(disks, io, harvested_time, settings.disk_use_binary_prefix);
 
+            averages.apply_disks(&mut self.disk_harvest, harvested_time, settings.average);
+
             if used_widgets.use_disk_io_graph {
                 self.time_series_data.update_disk_io(
                     &self.disk_harvest,
@@ -237,6 +241,7 @@ impl InnerData {
         }
 
         // And we're done eating. Update time and push the new entry!
+        averages.finish(harvested_time);
         self.last_update_time = harvested_time;
     }
 
@@ -379,6 +384,8 @@ pub enum FrozenState {
 
 /// What data to share to other parts of the application.
 pub struct DataStore {
+    // Averaging history is not part of a frozen display snapshot.
+    averages: super::average::ResourceAverages,
     frozen_state: FrozenState,
     inner: InnerData,
     used_widgets: UsedWidgets,
@@ -389,6 +396,7 @@ impl DataStore {
     /// Create a new [`DataStore`]
     pub fn new(used_widgets: UsedWidgets) -> Self {
         Self {
+            averages: Default::default(),
             frozen_state: FrozenState::default(),
             inner: InnerData::default(),
             used_widgets,
@@ -427,8 +435,13 @@ impl DataStore {
 
     /// Eat data.
     pub fn eat_data(&mut self, data: Box<Data>, settings: &AppConfigFields) {
-        self.inner
-            .eat_data(data, settings, &self.used_widgets, &self.filters);
+        self.inner.eat_data(
+            data,
+            settings,
+            &self.used_widgets,
+            &self.filters,
+            &mut self.averages,
+        );
     }
 
     /// Clean data.
@@ -440,5 +453,6 @@ impl DataStore {
     pub fn reset(&mut self) {
         self.frozen_state = FrozenState::NotFrozen;
         self.inner = InnerData::default();
+        self.averages = Default::default();
     }
 }

@@ -92,6 +92,9 @@ pub struct ProcessHarvest {
     /// The pid of the process.
     pub pid: Pid,
 
+    /// Platform-native start timestamp, used to distinguish reused PIDs.
+    pub start_time: u64,
+
     /// The parent PID of the process. A `parent_pid` of 0 is usually the root.
     pub parent_pid: Option<Pid>,
 

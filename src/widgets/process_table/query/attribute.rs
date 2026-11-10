@@ -74,8 +74,8 @@ impl ProcessAttribute {
                 .and_then(|split| split.cwd.as_deref())
                 .is_some_and(|cwd| re.is_match(cwd)),
             ProcessAttribute::Time(time) => time.check(process.time),
-            // TODO: It's a bit silly for some of these, like nice/priority, where it's casted to an
-            // f64.
+            // TODO: It's a bit silly for some of these, like nice/priority,
+            // where it's casted to an f64.
             #[cfg(unix)]
             ProcessAttribute::Nice(cmp) => cmp.check(process.nice as f64),
             ProcessAttribute::Priority(cmp) => cmp.check(process.priority as f64),

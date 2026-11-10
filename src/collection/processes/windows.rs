@@ -135,6 +135,7 @@ pub fn sysinfo_process_data(
 
         process_vector.push(ProcessHarvest {
             pid: pid as _,
+            start_time: process.start_time(),
             parent_pid: process.parent().map(|p| p.as_u32() as _),
             name,
             command,

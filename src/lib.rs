@@ -63,6 +63,10 @@ use crate::{app::TerminalFeatures, collection::Data};
 // #[global_allocator]
 // static ALLOC: dhat::Alloc = dhat::Alloc;
 
+#[cfg(all(feature = "musl_alloc", target_os = "linux", target_env = "musl"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 /// Try drawing. If not, clean up the terminal and return an error.
 fn try_drawing(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App, painter: &mut canvas::Painter,
@@ -378,8 +382,8 @@ pub fn start_bottom(enable_error_hook: &mut bool) -> anyhow::Result<()> {
     let mut bracketed_paste_enabled = true;
     let mouse_capture_enabled = !app.app_config_fields.disable_click;
 
-    // Note that some operating systems (basically Windows 8.1 and older) don't support
-    // this, so we'll catch the error, but not outright fail.
+    // Note that some operating systems (basically Windows 8.1 and older) don't
+    // support this, so we'll catch the error, but not outright fail.
     // For more info, see https://github.com/ClementTsang/bottom/issues/2277 and
     // https://github.com/helix-editor/helix/discussions/9025.
     match execute!(stdout_val, EnableBracketedPaste) {

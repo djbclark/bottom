@@ -22,7 +22,23 @@ That said, these are more guidelines rather than hard rules, though the project 
 
 ---
 
-## 0.15.0 - 2026-11-01
+## 0.15.1 - Unreleased
+
+### Changes
+
+- [#2296](https://github.com/ClementTsang/bottom/pull/2296): Better truncate CPU usage strings with small widths.
+
+### Bug Fixes
+
+- [#2300](https://github.com/ClementTsang/bottom/pull/2300): Fix dialog screens not blocking certain user events.
+- [#2298](https://github.com/ClementTsang/bottom/pull/2298): Fix hidden table columns shifting the widths of later columns and header clicks.
+
+### Other
+
+- [#2302](https://github.com/ClementTsang/bottom/pull/2302): Make the `aarch64-pc-windows-gnullvm` target statically linked.
+- [#2304](https://github.com/ClementTsang/bottom/pull/2304): Enable same-version upgrades for the Windows MSI installer.
+
+## 0.15.0 - 2026-10-31 🎃
 
 ### Features
 
@@ -190,7 +206,7 @@ That said, these are more guidelines rather than hard rules, though the project 
 - [#2009](https://github.com/ClementTsang/bottom/pull/2009): Configure CI job to publish to crates.io.
 - [#2037](https://github.com/ClementTsang/bottom/pull/2037): Update AMD GPU names list.
 
-## [0.12.3] - 2026-01-01
+## [0.12.3] - 2026-01-01 🥳
 
 ### Bug Fixes
 
