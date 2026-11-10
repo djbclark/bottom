@@ -105,6 +105,9 @@ pub(super) struct ResourceAverages {
     previous: Option<Instant>,
     duration: Duration,
     scalar: FxHashMap<String, Window<1>>,
+    sensor_names: Vec<String>,
+    #[cfg(feature = "gpu")]
+    gpu_names: Vec<String>,
     processes: FxHashMap<(Pid, u64), Window<10>>,
 }
 
@@ -160,9 +163,14 @@ impl ResourceAverages {
         }
         #[cfg(feature = "gpu")]
         if let Some(gpus) = &mut data.gpu {
-            for (name, memory) in gpus {
+            let names: Vec<_> = gpus.iter().map(|(name, _)| name.clone()).collect();
+            if self.gpu_names != names {
+                self.scalar.retain(|key, _| !key.starts_with("gpu:"));
+                self.gpu_names = names;
+            }
+            for (index, (name, memory)) in gpus.iter_mut().enumerate() {
                 memory.used_bytes = self
-                    .scalar(format!("gpu:{name}"), now, memory.used_bytes as f64)
+                    .scalar(format!("gpu:{index}:{name}"), now, memory.used_bytes as f64)
                     .round() as u64;
             }
         }
@@ -184,10 +192,18 @@ impl ResourceAverages {
             rate!(tx_packets);
         }
         if let Some(sensors) = &mut data.temperature_sensors {
-            for sensor in sensors {
+            let names: Vec<_> = sensors.iter().map(|sensor| sensor.name.clone()).collect();
+            if self.sensor_names != names {
+                self.scalar.retain(|key, _| !key.starts_with("temp:"));
+                self.sensor_names = names;
+            }
+            for (index, sensor) in sensors.iter_mut().enumerate() {
                 if let Some(value) = &mut sensor.temperature {
-                    *value =
-                        self.scalar(format!("temp:{}", sensor.name), now, (*value).into()) as f32;
+                    *value = self.scalar(
+                        format!("temp:{index}:{}", sensor.name),
+                        now,
+                        (*value).into(),
+                    ) as f32;
                 }
             }
         }
@@ -403,5 +419,56 @@ mod tests {
             averages.finish(time);
         }
         assert_eq!(averages.processes.values().next().unwrap().samples.len(), 1);
+    }
+    #[test]
+    fn duplicate_sensor_names_keep_independent_histories() {
+        let now = Instant::now();
+        let mut averages = ResourceAverages::default();
+        let span = Duration::from_secs(300);
+        for (second, values, expected) in [
+            (0, [0.0, 100.0], [0.0, 100.0]),
+            (1, [10.0, 90.0], [10.0, 90.0]),
+            (2, [30.0, 70.0], [20.0, 80.0]),
+        ] {
+            let time = now + Duration::from_secs(second);
+            let mut data = Data {
+                collection_time: time,
+                temperature_sensors: Some(
+                    values
+                        .into_iter()
+                        .map(
+                            |temperature| crate::collection::temperature::TempSensorData {
+                                name: "identical sensor".to_string(),
+                                temperature: Some(temperature),
+                            },
+                        )
+                        .collect(),
+                ),
+                ..Default::default()
+            };
+            averages.apply(&mut data, span);
+            averages.finish(time);
+            let temperatures: Vec<_> = data
+                .temperature_sensors
+                .unwrap()
+                .into_iter()
+                .map(|sensor| sensor.temperature.unwrap())
+                .collect();
+            assert_eq!(temperatures, expected);
+        }
+        let time = now + Duration::from_secs(3);
+        let mut changed = Data {
+            collection_time: time,
+            temperature_sensors: Some(vec![crate::collection::temperature::TempSensorData {
+                name: "identical sensor".to_string(),
+                temperature: Some(50.0),
+            }]),
+            ..Default::default()
+        };
+        averages.apply(&mut changed, span);
+        assert_eq!(
+            changed.temperature_sensors.unwrap()[0].temperature,
+            Some(50.0)
+        );
     }
 }
