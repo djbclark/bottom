@@ -41,6 +41,7 @@ jobs:
       - name: Exercise live TUI duration editor
         run: python3 .github/ci/averaging_smoke.py
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: averaging-linux
           path: |

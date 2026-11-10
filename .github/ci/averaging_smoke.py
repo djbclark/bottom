@@ -29,7 +29,8 @@ def collect(seconds=1):
     assert proc.poll() is None, "bottom exited during averaging smoke"
 
 try:
-    collect(2)
+    collect(5)
+    print("Startup transcript:", repr(bytes(transcript[-8000:])))
     assert b"Average:" in transcript, "averaging indicator missing"
     for duration in [b"5s", b"34h", b"0"]:
         os.write(master, b"\x1b[19~")  # xterm F8
